@@ -18,8 +18,10 @@ interface DeviceCardProps {
 
 export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
     const [loading, setLoading] = useState(false)
-    const [dialogOpen, setDialogOpen] = useState<'none' | 'message' | 'kill' | 'speak' | 'block_site'>('none')
+    const [dialogOpen, setDialogOpen] = useState<'none' | 'message' | 'kill' | 'speak' | 'block_site' | 'screenshot_view'>('none')
     const [inputValue, setInputValue] = useState('')
+
+    const [screenshotData, setScreenshotData] = useState<{ base64: string, date: string } | null>(null)
 
     const supabase = createClient()
 
@@ -27,16 +29,77 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
         heartbeat?.last_seen &&
         new Date(heartbeat.last_seen) > new Date(Date.now() - 2 * 60 * 1000)
 
+    const handleScreenshot = async () => {
+        setLoading(true)
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+
+            // 1. Send Command
+            await supabase.from('commands').insert({
+                device_id: device.device_id,
+                parent_id: user?.id || '00000000-0000-0000-0000-000000000000',
+                command_type: 'screenshot',
+                status: 'pending'
+            })
+
+            // 2. Poll for Result (wait for agent to upload)
+            let attempts = 0
+            const maxAttempts = 30 // Extended to 60 seconds
+            const poll = setInterval(async () => {
+                attempts++
+                if (attempts > maxAttempts) {
+                    clearInterval(poll)
+                    setLoading(false)
+                    alert('Screenshot timeout (Check Agent Logs).')
+                    return
+                }
+
+                const { data } = await supabase
+                    .from('device_logs')
+                    .select('*')
+                    .eq('device_id', device.device_id)
+                    .eq('log_type', 'screenshot')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
+
+                if (data && new Date(data.created_at) > new Date(Date.now() - 60000)) { // 60s window
+                    clearInterval(poll)
+                    setScreenshotData({
+                        base64: data.content,
+                        date: new Date(data.created_at).toLocaleString()
+                    })
+                    setDialogOpen('screenshot_view')
+                    setLoading(false)
+                }
+            }, 2000)
+
+        } catch (e) {
+            console.error(e)
+            setLoading(false)
+        }
+    }
+
+    const downloadScreenshot = () => {
+        if (!screenshotData) return
+        const link = document.createElement('a')
+        link.href = `data:image/png;base64,${screenshotData.base64}`
+        link.download = `screenshot_${device.device_id}.png`
+        link.click()
+    }
+
     const sendCommand = async (
         commandType: string,
         payload?: any
     ) => {
+        if (commandType === 'screenshot') {
+            return handleScreenshot()
+        }
+
         setLoading(true)
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
-                // For development without auth, we might bypass or use a test ID
-                // But normally we require auth. We'll try to proceed for now.
                 console.warn('Not authenticated, command might fail if RLS enforces auth.')
             }
 
@@ -184,7 +247,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
             </div>
 
             {/* Universal Dialog */}
-            {dialogOpen !== 'none' && (
+            {dialogOpen !== 'none' && dialogOpen !== 'screenshot_view' && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-slate-900 rounded-2xl p-6 max-w-sm w-full border border-white/10 shadow-2xl">
                         <h3 className="text-lg font-bold text-white mb-4 capitalize">
@@ -223,6 +286,47 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                                 className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                             >
                                 Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Screenshot Viewer Dialog */}
+            {dialogOpen === 'screenshot_view' && screenshotData && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-900 rounded-2xl p-4 max-w-4xl w-full border border-white/10 shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="flex justify-between items-center mb-4 px-2">
+                            <div>
+                                <h3 className="text-lg font-bold text-white">📸 Screenshot</h3>
+                                <p className="text-xs text-slate-400">{screenshotData.date}</p>
+                            </div>
+                            <button onClick={() => setDialogOpen('none')} className="p-2 hover:bg-white/10 rounded-full">
+                                <X className="w-5 h-5 text-slate-400" />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-auto bg-black rounded-xl border border-white/5 flex items-center justify-center p-2">
+                            <img
+                                src={`data:image/png;base64,${screenshotData.base64}`}
+                                alt="Screen Capture"
+                                className="max-w-full max-h-full object-contain"
+                            />
+                        </div>
+
+                        <div className="mt-4 flex justify-end gap-3 px-2">
+                            <button
+                                onClick={() => setDialogOpen('none')}
+                                className="px-6 py-2 bg-white/5 hover:bg-white/10 rounded-xl font-medium text-slate-300 transition-colors"
+                            >
+                                Close
+                            </button>
+                            <button
+                                onClick={downloadScreenshot}
+                                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold text-white hover:opacity-90 shadow-lg flex items-center gap-2"
+                            >
+                                <Camera className="w-4 h-4" />
+                                Download Image
                             </button>
                         </div>
                     </div>
