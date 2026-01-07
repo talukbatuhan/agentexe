@@ -12,7 +12,6 @@ import { createClient } from '@/lib/supabase/client'
 import AllowlistManager from './AllowlistManager'
 import { useToast } from '@/hooks/useToast'
 import { useConfirm } from '@/hooks/useConfirm'
-import { RefreshCw } from 'lucide-react'
 
 type Device = Database['public']['Tables']['devices']['Row']
 type Heartbeat = Database['public']['Tables']['heartbeat']['Row']
@@ -92,6 +91,35 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
         }
     }, [device.device_id, supabase, router])
 
+
+    const handleCleanup = async () => {
+        confirm.showConfirm(
+            {
+                title: 'Veri Temizliği',
+                message: 'Eski loglar ve ekran görüntüleri silinecek (7 günden eski). Devam edilsin mi?',
+                type: 'warning',
+                confirmText: 'Temizle',
+                cancelText: 'İptal'
+            },
+            async () => {
+                setLoading(true)
+                try {
+                    const { error } = await supabase.rpc('cleanup_old_data', { 
+                        p_device_id: device.device_id,
+                        p_days: 7 
+                    })
+                    
+                    if (error) throw error
+                    toast.success('Temizlik tamamlandı.')
+                } catch (e) {
+                    console.error(e)
+                    toast.error('Temizlik başarısız oldu.')
+                } finally {
+                    setLoading(false)
+                }
+            }
+        )
+    }
 
     const handleScreenshot = async (silent: boolean = false) => {
         if (!silent) {
@@ -462,6 +490,18 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                             </p>
                         </div>
 
+                        {/* System Specs (New) */}
+                        <div className="pt-2 border-t border-white/5 space-y-1">
+                             <div className="flex justify-between text-xs">
+                                <span className="text-slate-400">OS:</span>
+                                <span className="text-white">{(device as any).system_specs?.system || device.os_version || 'Win'} {(device as any).system_specs?.release || ''}</span>
+                            </div>
+                             <div className="flex justify-between text-xs">
+                                <span className="text-slate-400">Total RAM:</span>
+                                <span className="text-white">{(device as any).system_specs?.ram_total_gb ? `${(device as any).system_specs.ram_total_gb} GB` : 'N/A'}</span>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
                             <div>
                                 <div className="text-xs text-slate-400">CPU</div>
@@ -596,10 +636,10 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                         </button>
                     </a>
 
-                    <div className="col-span-2">
+                    <div className="col-span-1">
                         <ActionButton
                             icon={<Power className="w-4 h-4" />}
-                            label="Agent'ı Durdur"
+                            label="Agent Durdur"
                             color="red"
                             onClick={() => confirm.showConfirm(
                                 {
@@ -612,6 +652,16 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                                 () => sendCommand('stop_agent')
                             )}
                             disabled={!isOnline || loading}
+                        />
+                    </div>
+                    
+                    <div className="col-span-1">
+                        <ActionButton
+                            icon={<Trash2 className="w-4 h-4" />}
+                            label="Temizle"
+                            color="orange"
+                            onClick={handleCleanup}
+                            disabled={loading}
                         />
                     </div>
                 </div>
