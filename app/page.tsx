@@ -18,7 +18,7 @@ export default function Home() {
           </h1>
 
           <p className="text-xl text-slate-300 mb-8">
-            Monitor and control your children's PC remotely
+            Çocuklarınızın bilgisayarını uzaktan izleyin ve kontrol edin
           </p>
 
           <div className="flex gap-4 justify-center flex-wrap">
@@ -26,14 +26,14 @@ export default function Home() {
               href="/dashboard"
               className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-semibold text-white hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105"
             >
-              Go to Dashboard
+              Kontrol Paneline Git
             </Link>
 
             <Link
               href="/devices"
               className="px-8 py-4 bg-white/10 backdrop-blur-xl rounded-xl font-semibold text-white hover:bg-white/20 transition-all duration-300 border border-white/20"
             >
-              Manage Devices
+              Cihazları Yönet
             </Link>
           </div>
         </div>
@@ -42,25 +42,25 @@ export default function Home() {
         <div className="grid md:grid-cols-3 gap-6">
           <div className="bg-white/5 backdrop-blur-xl p-6 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all duration-300">
             <Monitor className="w-10 h-10 text-purple-400 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">Remote Control</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Uzaktan Kontrol</h3>
             <p className="text-slate-400 text-sm">
-              Lock PC, close applications, and send messages instantly
+              Bilgisayarı kilitleyin, uygulamaları kapatın ve anında mesaj gönderin
             </p>
           </div>
 
           <div className="bg-white/5 backdrop-blur-xl p-6 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all duration-300">
             <Activity className="w-10 h-10 text-pink-400 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">Live Monitoring</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Canlı İzleme</h3>
             <p className="text-slate-400 text-sm">
-              See active windows, CPU, and memory usage in real-time
+              Aktif pencereleri, CPU ve RAM kullanımını gerçek zamanlı görün
             </p>
           </div>
 
           <div className="bg-white/5 backdrop-blur-xl p-6 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all duration-300">
             <Shield className="w-10 h-10 text-blue-400 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">Secure & Private</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Güvenli ve Özel</h3>
             <p className="text-slate-400 text-sm">
-              End-to-end encrypted commands with Supabase security
+              Supabase güvenliği ile uçtan uca şifrelenmiş komutlar
             </p>
           </div>
         </div>
@@ -69,7 +69,7 @@ export default function Home() {
         <div className="mt-12 text-center">
           <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-full px-4 py-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-green-400 text-sm font-medium">System Online</span>
+            <span className="text-green-400 text-sm font-medium">Sistem Çevrimiçi</span>
           </div>
         </div>
       </div>
