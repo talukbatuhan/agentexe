@@ -56,9 +56,10 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
     }, [loading, isLive, dialogOpen, viewSource]) // eslint-disable-line
 
 
-    const isOnline = heartbeat?.is_online &&
-        heartbeat?.last_seen &&
-        new Date(heartbeat.last_seen) > new Date(Date.now() - 2 * 60 * 1000)
+    const lastSeenOk = heartbeat?.last_seen
+        ? new Date(heartbeat.last_seen) > new Date(Date.now() - 2 * 60 * 1000)
+        : false
+    const isOnline = Boolean(heartbeat?.is_online) && lastSeenOk
 
     const handleScreenshot = async (silent: boolean = false) => {
         if (!silent) {
@@ -1012,7 +1013,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                             </button>
                         </div>
                         <div className="p-6">
-                            <AllowlistManager deviceId={device.id} isOnline={isOnline} />
+                            <AllowlistManager deviceId={device.device_id} isOnline={isOnline} />
                         </div>
                     </div>
                 </div>

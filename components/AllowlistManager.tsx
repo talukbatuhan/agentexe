@@ -74,7 +74,7 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
             await supabase
                 .from('devices')
                 .update({ allowlist_enabled: newState })
-                .eq('id', deviceId)
+                .eq('device_id', deviceId)
 
             setEnabled(newState)
 
