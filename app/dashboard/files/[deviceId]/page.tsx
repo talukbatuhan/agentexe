@@ -266,7 +266,8 @@ export default function FileExplorerPage() {
                         <p>Empty Directory</p>
                     </div>
                 ) : (
-                    <table className="w-full text-left text-sm">
+                    <div className="w-full overflow-x-auto">
+                    <table className="min-w-[640px] w-full text-left text-sm">
                         <thead className="bg-white/5 text-slate-400 font-medium uppercase text-xs">
                             <tr>
                                 <th className="px-6 py-4">Name</th>
@@ -386,6 +387,7 @@ export default function FileExplorerPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
             <div className="col-span-12 lg:col-span-5 bg-slate-900/50 border border-white/10 rounded-xl min-h-[500px] p-4">

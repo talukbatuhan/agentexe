@@ -50,12 +50,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
         'lsass.exe','svchost.exe','fontdrvhost.exe','memory compression',
         'spoolsv.exe','explorer.exe','winlogon.exe','dwm.exe','rdpclip.exe',
         'sihost.exe','taskhostw.exe','ctfmon.exe','searchui.exe','runtimebroker.exe',
-        'lockapp.exe','audiodg.exe','wudfhost.exe','werfault.exe','smartscreen.exe',
-        'python.exe','pythonw.exe','cmd.exe','conhost.exe','powershell.exe',
-        'code.exe','node.exe','npm.exe',
-        'applicationframehost.exe','securityhealthservice.exe','searchapp.exe',
-        'startmenuexperiencehost.exe','shellexperiencehost.exe','textinputhost.exe',
-        'agent.exe','nvcontainer.exe','nvidia share.exe','radeonsoftware.exe'
+        'lockapp.exe','audiodg.exe','wudfhost.exe','werfault.exe','smartscreen.exe'
     ].map(x => x.toLowerCase()))
 
     const lastSeenOk = heartbeat?.last_seen
@@ -531,7 +526,10 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                         icon={<Folder className="w-4 h-4" />}
                         label="Dosyalar"
                         color="orange"
-                        onClick={() => window.location.href = `/dashboard/files/${device.device_id}`}
+                        onClick={() => {
+                            const startPath = encodeURIComponent('C:\\')
+                            window.location.href = `/dashboard/files/${device.device_id}?path=${startPath}`
+                        }}
                         disabled={!isOnline || loading}
                     />
                     <ActionButton
@@ -1057,8 +1055,8 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
 
             {/* Allowlist Dialog */}
             {dialogOpen === 'allowlist' && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+                <div className="fixed inset-0 z-50 flex items-center justify-center md:items-center md:justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4">
+                    <div className="bg-slate-900 border border-slate-700 rounded-none sm:rounded-2xl w-full h-full sm:h-auto sm:w-full sm:max-w-2xl max-h-[100vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl">
                         <div className="sticky top-0 bg-slate-900 border-b border-white/10 p-4 flex items-center justify-between z-10">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 <Shield className="w-5 h-5 text-red-400" />

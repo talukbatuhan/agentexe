@@ -176,12 +176,24 @@ export default function ProcessesPage() {
                 <button
                   className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition disabled:opacity-50"
                   title="Kill Process"
-                  onClick={() => {
+                  onClick={async () => {
                     if (PROTECTED_PROCESSES.has(proc.name.toLowerCase())) {
                       alert('Bu işlem sistem tarafından korunuyor')
                       return
                     }
-                    alert('Kill işlemi Dashboard’dan sınırlandırıldı; Agent tarafı kritik süreçleri engeller')
+                    try {
+                      const { data: { user } } = await supabase.auth.getUser()
+                      await supabase.from('commands').insert({
+                        device_id: deviceId,
+                        parent_id: user?.id || '00000000-0000-0000-0000-000000000000',
+                        command_type: 'kill_process',
+                        command_data: { payload: proc.name },
+                        status: 'pending'
+                      })
+                      setProcesses(prev => prev.filter(p => p.pid !== proc.pid))
+                    } catch (e) {
+                      alert('Kill komutu gönderilemedi')
+                    }
                   }}
                   disabled={PROTECTED_PROCESSES.has(proc.name.toLowerCase())}
                 >

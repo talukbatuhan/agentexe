@@ -86,7 +86,7 @@ export default async function DashboardPage() {
                         <p className="text-slate-400">Başlamak için bir bilgisayara HomeGuardian agent'ını yükleyin</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {devices.map((device) => (
                             <DeviceCard
                                 key={device.id}
