@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import DeviceCard from '@/components/DeviceCard'
+import AddDeviceButton from '@/components/AddDeviceButton'
 import { Database } from '@/types/database'
+
+export const dynamic = 'force-dynamic'
 
 type Device = Database['public']['Tables']['devices']['Row']
 type Heartbeat = Database['public']['Tables']['heartbeat']['Row']
@@ -55,11 +58,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="min-h-screen p-8">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-                        Kontrol Paneli
-                    </h1>
-                    <p className="text-slate-400">Cihazlarınızı izleyin ve kontrol edin</p>
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+                            Kontrol Paneli
+                        </h1>
+                        <p className="text-slate-400">Cihazlarınızı izleyin ve kontrol edin</p>
+                    </div>
+                    <AddDeviceButton />
                 </div>
 
                 {/* Stats Overview */}
@@ -87,7 +93,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 {!currentDevice ? (
                     <div className="bg-white/5 backdrop-blur-xl p-12 rounded-2xl border border-white/10 text-center">
                         <h3 className="text-xl font-semibold text-white mb-2">Henüz cihaz yok</h3>
-                        <p className="text-slate-400">Başlamak için bir bilgisayara HomeGuardian agent'ını yükleyin</p>
+                        <p className="text-slate-400">Başlamak için bir bilgisayara HomeGuardian agentını yükleyin</p>
                     </div>
                 ) : (
                     <div className="space-y-6">

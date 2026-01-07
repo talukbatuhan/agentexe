@@ -21,10 +21,9 @@ interface BlockedApp {
 
 interface AllowlistManagerProps {
     deviceId: string
-    isOnline: boolean
 }
 
-export default function AllowlistManager({ deviceId, isOnline }: AllowlistManagerProps) {
+export default function AllowlistManager({ deviceId }: AllowlistManagerProps) {
     const toast = useToast()
     const confirmDialog = useConfirm()
     const [enabled, setEnabled] = useState(false)
@@ -57,8 +56,8 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
             if (data) {
                 setEnabled(data.allowlist_enabled || false)
             }
-        } catch (e) {
-            console.error('Failed to fetch allowlist status:', e)
+        } catch {
+            console.error('Failed to fetch allowlist status')
         }
     }, [deviceId, supabase])
 
@@ -83,8 +82,8 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
             if (blocked) {
                 setBlockedApps(blocked)
             }
-        } catch (e) {
-            console.error('Failed to fetch allowed apps:', e)
+        } catch {
+            console.error('Failed to fetch allowed apps')
         } finally {
             setLoading(false)
         }
@@ -144,7 +143,14 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
             toast.success(`✅ "${newAppName}" izin listesine eklendi`)
         } catch (e: unknown) {
             const error = e as Error
-            toast.error('Uygulama eklenemedi: ' + error.message)
+            // Handle duplicate entry gracefully
+            if (error.message.includes('unique_device_app') || error.message.includes('duplicate key')) {
+                toast.info(`ℹ️ "${name}" zaten listede mevcut.`)
+                setNewAppName('')
+                setNewAppDesc('')
+            } else {
+                toast.error('Uygulama eklenemedi: ' + error.message)
+            }
         }
     }
 
@@ -273,6 +279,7 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
                 }
             }, 1000)
         } catch (e) {
+            console.error('Failed to fetch processes:', e)
             setProcLoading(false)
             toast.error('Süreçler alınamadı')
         }
@@ -326,8 +333,7 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
                         <h3 className="text-sm font-semibold text-white">İzin Verilen Uygulama Ekle</h3>
                         <button
                             onClick={openProcessPicker}
-                            disabled={!isOnline}
-                            className="flex items-center gap-2 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 transition-colors"
                             title="Çalışan süreçlerden ekle"
                         >
                             <ListPlus className="w-4 h-4" />

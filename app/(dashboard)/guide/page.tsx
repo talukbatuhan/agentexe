@@ -1,7 +1,7 @@
 import {
     Monitor, Lock, Camera, Volume2, MessageSquare,
     Mic, Ban, Globe, Shield, Clock, Eye, Power, FileText,
-    Video, Folder, RotateCcw, Trash2
+    Video, Folder, Trash2
 } from 'lucide-react'
 
 export default function GuidePage() {
@@ -158,7 +158,7 @@ export default function GuidePage() {
     )
 }
 
-function FeatureItem({ icon, title, desc }: { icon: any, title: string, desc: string }) {
+function FeatureItem({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
     return (
         <div className="flex gap-3 items-start p-2 rounded-lg hover:bg-white/5 transition-colors">
             <div className="mt-1 shrink-0">{icon}</div>

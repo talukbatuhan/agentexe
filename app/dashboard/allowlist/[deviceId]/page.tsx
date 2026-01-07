@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import AllowlistManager from '@/components/AllowlistManager'
-import { Shield, ArrowLeft, Loader2 } from 'lucide-react'
+import FocusModeManager from '@/components/FocusModeManager'
+import { ArrowLeft, Loader2, Monitor } from 'lucide-react'
 
 export default function AllowlistPage() {
   const params = useParams()
@@ -12,13 +12,12 @@ export default function AllowlistPage() {
   const deviceId = params.deviceId as string
   const supabase = createClient()
 
-  const [isOnline, setIsOnline] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
     ;(async () => {
       try {
-        const { data } = await supabase
+        await supabase
           .from('heartbeat')
           .select('*')
           .eq('device_id', deviceId)
@@ -26,10 +25,7 @@ export default function AllowlistPage() {
           .limit(1)
           .maybeSingle()
 
-        if (data) {
-          const lastSeenOk = data.last_seen ? new Date(data.last_seen) > new Date(Date.now() - 2 * 60 * 1000) : false
-          setIsOnline(Boolean(data.is_online) && lastSeenOk)
-        }
+        // Online durum bilgisi bu sayfada kullanılmıyor
       } finally {
         setLoading(false)
       }
@@ -45,11 +41,16 @@ export default function AllowlistPage() {
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Shield className="w-6 h-6 text-red-400" />
-            Application Allowlist
+            <Monitor className="w-6 h-6 text-blue-400" />
+            Odak Modu (Focus Lock)
           </h1>
         </div>
       </div>
+      
+       <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-800 rounded-lg text-yellow-200 text-sm">
+         ⚠️ İzin Listesi (Allowlist) özelliği bakıma alınmıştır. Yerine daha basit ve etkili olan Odak Modunu kullanabilirsiniz.
+       </div>
+
       {loading ? (
         <div className="flex items-center justify-center h-64 text-slate-400">
           <Loader2 className="w-10 h-10 animate-spin" />
@@ -57,7 +58,7 @@ export default function AllowlistPage() {
       ) : (
         <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full overflow-hidden">
           <div className="p-6">
-            <AllowlistManager deviceId={deviceId} isOnline={isOnline} />
+            <FocusModeManager deviceId={deviceId} />
           </div>
         </div>
       )}

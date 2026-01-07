@@ -4,17 +4,20 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
     Monitor, Activity, Lock, X, MessageSquare, Loader2,
-    Camera, Mic, Ban, Globe, Volume2, Maximize, Minimize,
-    Power, BookOpen, Video, Folder, RotateCcw, Trash2, Home, ArrowUp, Shield
+    Camera, Mic, Globe, Volume2, Maximize, Minimize,
+    Power, BookOpen, Video, Folder, RotateCcw, Trash2, Home, ArrowUp, Shield, RefreshCw
 } from 'lucide-react'
 import { Database } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import AllowlistManager from './AllowlistManager'
 import { useToast } from '@/hooks/useToast'
 import { useConfirm } from '@/hooks/useConfirm'
+import Image from 'next/image'
 
 type Device = Database['public']['Tables']['devices']['Row']
 type Heartbeat = Database['public']['Tables']['heartbeat']['Row']
+type FileItem = { name: string; type: 'file' | 'dir'; size: number; path: string }
+type ProcessItem = { pid: number; name: string; memory: number }
 
 interface DeviceCardProps {
     device: Device
@@ -31,11 +34,11 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
     const [voiceSelection, setVoiceSelection] = useState('google_tr')
     const [screenshotData, setScreenshotData] = useState<{ base64: string, date: string } | null>(null)
     const [isFullScreen, setIsFullScreen] = useState(false)
-    const [fileList, setFileList] = useState<any[]>([])
+    const [fileList, setFileList] = useState<FileItem[]>([])
     const [currentPath, setCurrentPath] = useState<string>('')
     const [viewSource, setViewSource] = useState<'screenshot' | 'webcam' | null>(null)
     const [isLive, setIsLive] = useState(false)
-    const [runningProcesses, setRunningProcesses] = useState<any[]>([])
+    const [runningProcesses, setRunningProcesses] = useState<ProcessItem[]>([])
     const [searchTerm, setSearchTerm] = useState('')
 
     const filteredProcesses = runningProcesses.filter(p =>
@@ -114,6 +117,35 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                 } catch (e) {
                     console.error(e)
                     toast.error('Temizlik başarısız oldu.')
+                } finally {
+                    setLoading(false)
+                }
+            }
+        )
+    }
+
+    const handleDeleteDevice = async () => {
+        confirm.showConfirm(
+            {
+                title: 'Cihazı Sil',
+                message: 'Bu cihaz ve tüm verileri kalıcı olarak silinecek. Emin misiniz?',
+                type: 'danger',
+                confirmText: 'SİL',
+                cancelText: 'İptal'
+            },
+            async () => {
+                setLoading(true)
+                try {
+                    // 1. Delete from devices table (Cascade should handle the rest but let's be safe)
+                    const { error } = await supabase.from('devices').delete().eq('device_id', device.device_id)
+                    
+                    if (error) throw error
+                    
+                    toast.success('Cihaz silindi.')
+                    router.refresh()
+                } catch (e) {
+                    console.error(e)
+                    toast.error('Cihaz silinemedi.')
                 } finally {
                     setLoading(false)
                 }
@@ -303,7 +335,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                     clearInterval(poll)
                     let content = data.content
                     if (typeof content === 'string') {
-                        try { content = JSON.parse(content) } catch (e) { }
+                        try { content = JSON.parse(content) } catch { }
                     }
 
                     if (content.files) {
@@ -315,8 +347,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                 }
             }, 1000)
 
-        } catch (e) {
-            console.error(e)
+        } catch {
             setLoading(false)
         }
     }
@@ -371,7 +402,6 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
 
             if (data && new Date(data.created_at) > new Date(Date.now() - 60000)) {
                 clearInterval(poll)
-                const meta = data.metadata || {}
                 setScreenshotData({
                     base64: data.content,
                     date: new Date(data.created_at).toLocaleString()
@@ -394,7 +424,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
 
     const sendCommand = async (
         commandType: string,
-        payload?: any,
+        payload?: unknown,
         silent: boolean = false // Yeni parametre: Sessiz mod
     ) => {
         if (commandType === 'screenshot') {
@@ -431,9 +461,10 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                 setInputValue('')
             }
 
-        } catch (error: any) {
+        } catch (err: unknown) {
+            const error = err as Error
             console.error(error)
-            toast.error('Komut gönderilemedi: ' + error.message)
+            toast.error('Komut gönderilemedi: ' + (error.message || 'Bilinmeyen hata'))
         } finally {
             setLoading(false)
         }
@@ -494,11 +525,23 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                         <div className="pt-2 border-t border-white/5 space-y-1">
                              <div className="flex justify-between text-xs">
                                 <span className="text-slate-400">OS:</span>
-                                <span className="text-white">{(device as any).system_specs?.system || device.os_version || 'Win'} {(device as any).system_specs?.release || ''}</span>
+                                {(() => {
+                                    type SystemSpecs = { system?: string; release?: string }
+                                    const sys = (device as unknown as { system_specs?: SystemSpecs }).system_specs
+                                    return (
+                                        <span className="text-white">{(sys?.system || device.os_version || 'Win')} {sys?.release || ''}</span>
+                                    )
+                                })()}
                             </div>
                              <div className="flex justify-between text-xs">
                                 <span className="text-slate-400">Total RAM:</span>
-                                <span className="text-white">{(device as any).system_specs?.ram_total_gb ? `${(device as any).system_specs.ram_total_gb} GB` : 'N/A'}</span>
+                                {(() => {
+                                    type SystemSpecs = { ram_total_gb?: number }
+                                    const sys = (device as unknown as { system_specs?: SystemSpecs }).system_specs
+                                    return (
+                                        <span className="text-white">{sys?.ram_total_gb ? `${sys.ram_total_gb} GB` : 'N/A'}</span>
+                                    )
+                                })()}
                             </div>
                         </div>
 
@@ -664,6 +707,15 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                             disabled={loading}
                         />
                     </div>
+                     <div className="col-span-1">
+                         <ActionButton
+                            icon={<X className="w-4 h-4" />}
+                            label="Cihazı Sil"
+                            color="red"
+                            onClick={handleDeleteDevice}
+                            disabled={loading}
+                        />
+                    </div>
                 </div>
 
                 {/* File Explorer Dialog */}
@@ -701,7 +753,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                             </div>
 
                             <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
-                                {fileList.map((file: any, i: number) => (
+                                {fileList.map((file: FileItem, i: number) => (
                                     <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 group border border-transparent hover:border-white/5 transition-all">
                                         <button
                                             className="flex items-center gap-3 flex-1 text-left"
@@ -776,7 +828,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                                 {loading && runningProcesses.length === 0 && (
                                     <div className="py-8 text-center text-slate-500">Loading processes...</div>
                                 )}
-                                {filteredProcesses.map((proc: any, i: number) => (
+                                {filteredProcesses.map((proc: ProcessItem, i: number) => (
                                     <div key={i} className="grid grid-cols-12 items-center p-2 rounded-lg hover:bg-white/5 group border border-transparent hover:border-white/5 transition-all text-sm">
                                         <div className="col-span-6 text-left font-medium text-slate-200 truncate pr-2" title={proc.name}>
                                             <span className={proc.name.toLowerCase().includes('code') ? 'text-blue-400' : ''}>{proc.name}</span>
@@ -1082,11 +1134,13 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                         </div>
 
                         {/* Image */}
-                        <div className="flex items-center justify-center bg-black w-full h-full min-h-[400px]">
-                            <img
+                        <div className="relative flex-1 bg-black w-full min-h-[400px]">
+                            <Image
                                 src={`data:image/jpeg;base64,${screenshotData.base64}`}
                                 alt="Capture"
-                                className={`object-contain ${isFullScreen ? 'max-h-screen' : 'max-h-[80vh]'}`}
+                                className="object-contain"
+                                fill
+                                unoptimized
                             />
                         </div>
 
@@ -1117,7 +1171,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                             </button>
                         </div>
                         <div className="p-6">
-                            <AllowlistManager deviceId={device.device_id} isOnline={isOnline} />
+                            <AllowlistManager deviceId={device.device_id} />    
                         </div>
                     </div>
                 </div>
@@ -1126,8 +1180,16 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
     )
 }
 
-function ActionButton({ icon, label, onClick, disabled, color }: any) {
-    const colorClasses: any = {
+type ActionButtonProps = {
+    icon: React.ReactNode
+    label: string
+    onClick: () => void
+    disabled?: boolean
+    color: 'red' | 'orange' | 'blue' | 'green' | 'purple' | 'indigo' | 'pink' | 'yellow'
+}
+
+function ActionButton({ icon, label, onClick, disabled, color }: ActionButtonProps) {
+    const colorClasses: Record<ActionButtonProps['color'], string> = {
         red: 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20',
         orange: 'bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500/20',
         blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20',

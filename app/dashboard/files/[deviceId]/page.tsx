@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
     Folder, FileText, ArrowLeft, Home, Download, Trash2,
-    ChevronRight, RefreshCw, Loader2, File, Image as ImageIcon,
+    RefreshCw, Loader2, File, Image as ImageIcon,
     Music, Video, Code
 } from 'lucide-react';
+import Image from 'next/image';
+
+type FileItem = { name: string; type: 'file' | 'dir'; size: number; path: string }
 
 export default function FileExplorerPage() {
     const params = useParams(); // { deviceId }
@@ -17,7 +20,7 @@ export default function FileExplorerPage() {
     const initialPath = searchParams.get('path') || '';
 
     const [currentPath, setCurrentPath] = useState(initialPath);
-    const [files, setFiles] = useState<any[]>([]);
+    const [files, setFiles] = useState<FileItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [downloading, setDownloading] = useState<string | null>(null);
@@ -27,12 +30,8 @@ export default function FileExplorerPage() {
     const [videoPoster, setVideoPoster] = useState<string | null>(null);
 
     const supabase = createClient();
-
-    useEffect(() => {
-        fetchFiles(currentPath);
-    }, [currentPath]);
-
-    const fetchFiles = async (path: string) => {
+    
+    const fetchFiles = useCallback(async (path: string) => {
         setLoading(true);
         setError(null);
         setFiles([]);
@@ -75,7 +74,7 @@ export default function FileExplorerPage() {
                     clearInterval(poll);
                     let content = data.content;
                     if (typeof content === 'string') {
-                        try { content = JSON.parse(content); } catch (e) { }
+                        try { content = JSON.parse(content); } catch { }
                     }
 
                     if (content.files) {
@@ -97,12 +96,17 @@ export default function FileExplorerPage() {
                 }
             }, 1000);
 
-        } catch (e: any) {
-            console.error(e);
-            setError(e.message);
+        } catch (err: unknown) {
+            const error = err as Error
+            console.error(error);
+            setError(error.message || 'Listeleme başarısız');
             setLoading(false);
         }
-    };
+    }, [supabase, deviceId, currentPath]);
+    
+    useEffect(() => {
+        fetchFiles(currentPath);
+    }, [currentPath, fetchFiles]);
 
     const handleDownload = async (filePath: string) => {
         setDownloading(filePath);
@@ -163,12 +167,7 @@ export default function FileExplorerPage() {
         }
     };
 
-    const handleDelete = async (filePath: string) => {
-        if (!confirm(`Permanently delete ${filePath}?`)) return;
-        // Send delete command logic here (omitted for brevity, can duplicate from DeviceCard)
-        // For now, let's focus on navigation and download as requested.
-        alert("Delete coming soon to full page explorer.");
-    };
+    // Delete behavior is handled via DeviceCard dialog for now
 
     const guessMime = (fileName: string) => {
         const ext = fileName.split('.').pop()?.toLowerCase();
@@ -399,11 +398,15 @@ export default function FileExplorerPage() {
                     </div>
                 ) : previewBase64 ? (
                     previewMime.startsWith('image/') ? (
-                        <img
-                            alt="preview"
-                            className="max-h-[420px] max-w-full rounded-lg border border-white/10"
-                            src={`data:${previewMime};base64,${previewBase64}`}
-                        />
+                        <div className="relative w-full h-[420px]">
+                            <Image
+                                alt="preview"
+                                className="object-contain rounded-lg border border-white/10"
+                                src={`data:${previewMime};base64,${previewBase64}`}
+                                fill
+                                unoptimized
+                            />
+                        </div>
                     ) : previewMime.startsWith('text/') || previewMime === 'application/json' ? (
                         <div className="bg-black/40 border border-white/10 rounded-lg p-3 font-mono text-xs text-slate-300 max-h-[420px] overflow-auto">
                             {atob(previewBase64)}
@@ -417,7 +420,15 @@ export default function FileExplorerPage() {
                     ) : previewMime.startsWith('video/') ? (
                         <div className="flex flex-col gap-3">
                             {videoPoster ? (
-                                <img alt="video poster" className="max-h-[320px] rounded-lg border border-white/10" src={videoPoster} />
+                                <div className="relative w-full h-[320px]">
+                                    <Image
+                                        alt="video poster"
+                                        className="object-contain rounded-lg border border-white/10"
+                                        src={videoPoster}
+                                        fill
+                                        unoptimized
+                                    />
+                                </div>
                             ) : (
                                 <video
                                     className="max-h-[320px] rounded-lg border border-white/10"

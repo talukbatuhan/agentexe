@@ -37,8 +37,9 @@ export default function LoginPage() {
                 router.push('/dashboard')
                 router.refresh()
             }
-        } catch (error: any) {
-            setError(error.message)
+        } catch (err: unknown) {
+            const error = err as Error
+            setError(error.message || 'Login failed')
         } finally {
             setLoading(false)
         }
@@ -138,7 +139,7 @@ export default function LoginPage() {
                             {isSignUp ? (
                                 <>Already have an account? <span className="font-semibold">Sign In</span></>
                             ) : (
-                                <>Don't have an account? <span className="font-semibold">Sign Up</span></>
+                                <>Don&rsquo;t have an account? <span className="font-semibold">Sign Up</span></>
                             )}
                         </button>
                     </div>

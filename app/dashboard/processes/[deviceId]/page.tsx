@@ -191,10 +191,10 @@ export default function ProcessesPage() {
                         status: 'pending'
                       })
                       setProcesses(prev => prev.filter(p => p.pid !== proc.pid))
-                    } catch (e) {
-                      alert('Kill komutu gönderilemedi')
-                    }
-                  }}
+          } catch {
+            alert('Kill komutu gönderilemedi')
+          }
+        }}
                   disabled={PROTECTED_PROCESSES.has(proc.name.toLowerCase())}
                 >
                   <X className="w-4 h-4" />
