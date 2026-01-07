@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
     Monitor, Activity, Lock, X, MessageSquare, Loader2,
     Camera, Mic, Ban, Globe, Volume2, Maximize, Minimize,
@@ -11,6 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import AllowlistManager from './AllowlistManager'
 import { useToast } from '@/hooks/useToast'
 import { useConfirm } from '@/hooks/useConfirm'
+import { RefreshCw } from 'lucide-react'
 
 type Device = Database['public']['Tables']['devices']['Row']
 type Heartbeat = Database['public']['Tables']['heartbeat']['Row']
@@ -23,6 +25,7 @@ interface DeviceCardProps {
 export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
     const toast = useToast()
     const confirm = useConfirm()
+    const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [dialogOpen, setDialogOpen] = useState<'none' | 'message' | 'kill' | 'speak' | 'block_site' | 'screenshot_view' | 'volume' | 'file_explorer' | 'process_manager' | 'allowlist'>('none')
     const [inputValue, setInputValue] = useState('')
@@ -42,6 +45,23 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
     )
 
     const supabase = createClient()
+    const PROTECTED_PROCESSES = new Set<string>([
+        'system','registry','smss.exe','csrss.exe','wininit.exe','services.exe',
+        'lsass.exe','svchost.exe','fontdrvhost.exe','memory compression',
+        'spoolsv.exe','explorer.exe','winlogon.exe','dwm.exe','rdpclip.exe',
+        'sihost.exe','taskhostw.exe','ctfmon.exe','searchui.exe','runtimebroker.exe',
+        'lockapp.exe','audiodg.exe','wudfhost.exe','werfault.exe','smartscreen.exe',
+        'python.exe','pythonw.exe','cmd.exe','conhost.exe','powershell.exe',
+        'code.exe','node.exe','npm.exe',
+        'applicationframehost.exe','securityhealthservice.exe','searchapp.exe',
+        'startmenuexperiencehost.exe','shellexperiencehost.exe','textinputhost.exe',
+        'agent.exe','nvcontainer.exe','nvidia share.exe','radeonsoftware.exe'
+    ].map(x => x.toLowerCase()))
+
+    const lastSeenOk = heartbeat?.last_seen
+        ? new Date(heartbeat.last_seen) > new Date(Date.now() - 2 * 60 * 1000)
+        : false
+    const isOnline = Boolean(heartbeat?.is_online) && lastSeenOk
 
     // Live Mode Loop
     useEffect(() => {
@@ -54,12 +74,29 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
         }
         return () => clearTimeout(timeout)
     }, [loading, isLive, dialogOpen, viewSource]) // eslint-disable-line
+    useEffect(() => {
+        let interval: NodeJS.Timeout | undefined
+        if (!isOnline) {
+            interval = setInterval(() => {
+                router.refresh()
+            }, 30000)
+        }
+        return () => {
+            if (interval) clearInterval(interval)
+        }
+    }, [isOnline, router])
+    useEffect(() => {
+        const channel = supabase.channel(`hb_${device.device_id}`).on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'heartbeat', filter: `device_id=eq.${device.device_id}` },
+            () => router.refresh()
+        )
+        channel.subscribe()
+        return () => {
+            channel.unsubscribe()
+        }
+    }, [device.device_id, supabase, router])
 
-
-    const lastSeenOk = heartbeat?.last_seen
-        ? new Date(heartbeat.last_seen) > new Date(Date.now() - 2 * 60 * 1000)
-        : false
-    const isOnline = Boolean(heartbeat?.is_online) && lastSeenOk
 
     const handleScreenshot = async (silent: boolean = false) => {
         if (!silent) {
@@ -406,6 +443,15 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                         }`}>
                         {isOnline ? '● Online' : '○ Offline'}
                     </div>
+                    {!isOnline && (
+                        <button
+                            onClick={() => router.refresh()}
+                            className="ml-2 p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                            title="Yenile"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
 
                 {/* Status Info */}
@@ -492,7 +538,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                         icon={<Activity className="w-4 h-4" />}
                         label="Görev Yön."
                         color="red"
-                        onClick={() => handleGetProcesses()}
+                        onClick={() => window.location.href = `/dashboard/processes/${device.device_id}`}
                         disabled={!isOnline || loading}
                     />
 
@@ -508,7 +554,7 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                         icon={<Shield className="w-4 h-4" />}
                         label="İzin Listesi"
                         color="red"
-                        onClick={() => setDialogOpen('allowlist')}
+                        onClick={() => window.location.href = `/dashboard/allowlist/${device.device_id}`}
                         disabled={loading}
                     />
                     <ActionButton
@@ -686,6 +732,11 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                                     <div key={i} className="grid grid-cols-12 items-center p-2 rounded-lg hover:bg-white/5 group border border-transparent hover:border-white/5 transition-all text-sm">
                                         <div className="col-span-6 text-left font-medium text-slate-200 truncate pr-2" title={proc.name}>
                                             <span className={proc.name.toLowerCase().includes('code') ? 'text-blue-400' : ''}>{proc.name}</span>
+                                            {PROTECTED_PROCESSES.has(proc.name.toLowerCase()) && (
+                                                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] border border-yellow-500/30">
+                                                    <Shield className="w-3 h-3" /> Korunan
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="col-span-3 text-right text-slate-500 font-mono">
                                             {proc.pid}
@@ -695,6 +746,11 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
 
                                             <button
                                                 onClick={() => {
+                                                    const protectedProc = PROTECTED_PROCESSES.has(proc.name.toLowerCase())
+                                                    if (protectedProc) {
+                                                        toast.warning('Bu işlem sistem tarafından korunuyor')
+                                                        return
+                                                    }
                                                     confirm.showConfirm(
                                                         {
                                                             title: 'İşlemi Sonlandır',
@@ -705,13 +761,13 @@ export default function DeviceCard({ device, heartbeat }: DeviceCardProps) {
                                                         },
                                                         () => {
                                                             sendCommand('kill_process', proc.name);
-                                                            // Optimistic remove
                                                             setRunningProcesses(prev => prev.filter(p => p.pid !== proc.pid));
                                                         }
                                                     )
                                                 }}
                                                 className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition opacity-0 group-hover:opacity-100"
                                                 title="Kill Process"
+                                                disabled={PROTECTED_PROCESSES.has(proc.name.toLowerCase()) || !isOnline || loading}
                                             >
                                                 <X className="w-4 h-4" />
                                             </button>

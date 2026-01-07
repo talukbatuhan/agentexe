@@ -21,6 +21,10 @@ export default function FileExplorerPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [downloading, setDownloading] = useState<string | null>(null);
+    const [selectedPath, setSelectedPath] = useState<string | null>(null);
+    const [previewBase64, setPreviewBase64] = useState<string | null>(null);
+    const [previewMime, setPreviewMime] = useState<string>('application/octet-stream');
+    const [videoPoster, setVideoPoster] = useState<string | null>(null);
 
     const supabase = createClient();
 
@@ -85,6 +89,9 @@ export default function FileExplorerPage() {
                             // Backend might normalize path (e.g., C:/Users/ -> C:\Users)
                             // Don't loop infinitely, just sync visual state if critically different
                         }
+                        setPreviewBase64(null);
+                        setSelectedPath(null);
+                        setVideoPoster(null);
                     }
                     setLoading(false);
                 }
@@ -163,6 +170,19 @@ export default function FileExplorerPage() {
         alert("Delete coming soon to full page explorer.");
     };
 
+    const guessMime = (fileName: string) => {
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext || '')) return `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+        if (['txt', 'log'].includes(ext || '')) return 'text/plain';
+        if (['md'].includes(ext || '')) return 'text/markdown';
+        if (['json'].includes(ext || '')) return 'application/json';
+        if (['mp3'].includes(ext || '')) return 'audio/mpeg';
+        if (['wav'].includes(ext || '')) return 'audio/wav';
+        if (['mp4'].includes(ext || '')) return 'video/mp4';
+        if (['pdf'].includes(ext || '')) return 'application/pdf';
+        return 'application/octet-stream';
+    };
+
     const getFileIcon = (fileName: string) => {
         const ext = fileName.split('.').pop()?.toLowerCase();
         if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(ext || '')) return <ImageIcon className="w-5 h-5 text-purple-400" />;
@@ -224,8 +244,9 @@ export default function FileExplorerPage() {
                 </button>
             </div>
 
-            {/* File List */}
-            <div className="bg-slate-900/50 border border-white/10 rounded-xl overflow-hidden min-h-[500px]">
+            {/* File List + Preview */}
+            <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-12 lg:col-span-7 bg-slate-900/50 border border-white/10 rounded-xl overflow-hidden min-h-[500px]">
                 {loading && files.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-96 text-slate-400 gap-3">
                         <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
@@ -285,8 +306,50 @@ export default function FileExplorerPage() {
                                     <td
                                         className="px-6 py-3 cursor-pointer"
                                         onClick={() => {
-                                            if (file.type === 'dir') setCurrentPath(file.path);
-                                            else handleDownload(file.path);
+                                            if (file.type === 'dir') {
+                                                setCurrentPath(file.path);
+                                            } else {
+                                                setSelectedPath(file.path);
+                                                setPreviewBase64(null);
+                                                // Fetch preview via get_file
+                                                (async () => {
+                                                    try {
+                                                        const { data: { user } } = await supabase.auth.getUser();
+                                                        await supabase.from('commands').insert({
+                                                            device_id: deviceId,
+                                                            parent_id: user?.id || '00000000-0000-0000-0000-000000000000',
+                                                            command_type: 'get_file',
+                                                            command_data: { payload: file.path },
+                                                            status: 'pending'
+                                                        });
+                                                        let attempts = 0;
+                                                        const maxAttempts = 30;
+                                                        const poll = setInterval(async () => {
+                                                            attempts++;
+                                                            if (attempts > maxAttempts) {
+                                                                clearInterval(poll);
+                                                                return;
+                                                            }
+                                                            const { data } = await supabase
+                                                                .from('device_logs')
+                                                                .select('*')
+                                                                .eq('device_id', deviceId)
+                                                                .eq('log_type', 'info')
+                                                                .contains('metadata', { subtype: 'file_download' })
+                                                                .order('created_at', { ascending: false })
+                                                                .limit(1)
+                                                                .single();
+                                                            if (data && new Date(data.created_at) > new Date(Date.now() - 40000)) {
+                                                                clearInterval(poll);
+                                                                const b64 = data.content as string;
+                                                                setPreviewBase64(b64);
+                                                                setPreviewMime(guessMime(file.name));
+                                                                setVideoPoster(null);
+                                                            }
+                                                        }, 1000);
+                                                    } catch (e) { console.error(e); }
+                                                })();
+                                            }
                                         }}
                                     >
                                         <div className="flex items-center gap-3">
@@ -324,6 +387,81 @@ export default function FileExplorerPage() {
                         </tbody>
                     </table>
                 )}
+            </div>
+            <div className="col-span-12 lg:col-span-5 bg-slate-900/50 border border-white/10 rounded-xl min-h-[500px] p-4">
+                <h3 className="text-sm font-semibold text-white mb-3">Ön İzleme</h3>
+                {!selectedPath ? (
+                    <div className="flex flex-col items-center justify-center h-[420px] text-slate-500 gap-2">
+                        <File className="w-10 h-10 opacity-20" />
+                        <p>Bir dosya seçin</p>
+                    </div>
+                ) : previewBase64 ? (
+                    previewMime.startsWith('image/') ? (
+                        <img
+                            alt="preview"
+                            className="max-h-[420px] max-w-full rounded-lg border border-white/10"
+                            src={`data:${previewMime};base64,${previewBase64}`}
+                        />
+                    ) : previewMime.startsWith('text/') || previewMime === 'application/json' ? (
+                        <div className="bg-black/40 border border-white/10 rounded-lg p-3 font-mono text-xs text-slate-300 max-h-[420px] overflow-auto">
+                            {atob(previewBase64)}
+                        </div>
+                    ) : previewMime === 'application/pdf' ? (
+                        <iframe
+                            title="pdf-preview"
+                            className="w-full h-[420px] rounded-lg border border-white/10 bg-white"
+                            src={`data:application/pdf;base64,${previewBase64}`}
+                        />
+                    ) : previewMime.startsWith('video/') ? (
+                        <div className="flex flex-col gap-3">
+                            {videoPoster ? (
+                                <img alt="video poster" className="max-h-[320px] rounded-lg border border-white/10" src={videoPoster} />
+                            ) : (
+                                <video
+                                    className="max-h-[320px] rounded-lg border border-white/10"
+                                    src={`data:${previewMime};base64,${previewBase64}`}
+                                    controls
+                                    onLoadedMetadata={(e) => {
+                                        const v = e.currentTarget
+                                        try {
+                                            v.currentTime = 0.1
+                                            const handler = () => {
+                                                const canvas = document.createElement('canvas')
+                                                canvas.width = v.videoWidth
+                                                canvas.height = v.videoHeight
+                                                const ctx = canvas.getContext('2d')
+                                                if (ctx) {
+                                                    ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+                                                    setVideoPoster(canvas.toDataURL('image/png'))
+                                                }
+                                                v.removeEventListener('seeked', handler)
+                                            }
+                                            v.addEventListener('seeked', handler)
+                                        } catch {}
+                                    }}
+                                />
+                            )}
+                            <a
+                                className="text-xs inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg"
+                                href={`data:${previewMime};base64,${previewBase64}`}
+                                download="video"
+                            >
+                                Videoyu indir
+                            </a>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-[420px] text-slate-500 gap-2">
+                            <FileText className="w-10 h-10 opacity-20" />
+                            <p>Bu dosya türü için hızlı önizleme yok</p>
+                        </div>
+                    )
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-[420px] text-slate-400 gap-2">
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        <p>İçerik yükleniyor...</p>
+                    </div>
+                )}
+            </div>
             </div>
         </div>
     );

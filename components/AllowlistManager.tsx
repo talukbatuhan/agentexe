@@ -27,6 +27,18 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
     const [newAppName, setNewAppName] = useState('')
     const [newAppDesc, setNewAppDesc] = useState('')
     const supabase = createClient()
+    const SYSTEM_PROTECTED = new Set<string>([
+        'system','registry','smss.exe','csrss.exe','wininit.exe','services.exe',
+        'lsass.exe','svchost.exe','fontdrvhost.exe','memory compression',
+        'spoolsv.exe','explorer.exe','winlogon.exe','dwm.exe','rdpclip.exe',
+        'sihost.exe','taskhostw.exe','ctfmon.exe','searchui.exe','runtimebroker.exe',
+        'lockapp.exe','audiodg.exe','wudfhost.exe','werfault.exe','smartscreen.exe',
+        'python.exe','pythonw.exe','cmd.exe','conhost.exe','powershell.exe',
+        'code.exe','node.exe','npm.exe',
+        'applicationframehost.exe','securityhealthservice.exe','searchapp.exe',
+        'startmenuexperiencehost.exe','shellexperiencehost.exe','textinputhost.exe',
+        'agent.exe','nvcontainer.exe','nvidia share.exe','radeonsoftware.exe'
+    ].map(x => x.toLowerCase()))
 
     const fetchAllowlistStatus = useCallback(async () => {
         try {
@@ -94,11 +106,16 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
             toast.warning('Lütfen bir uygulama adı girin (örn: chrome.exe)')
             return
         }
+        const name = newAppName.trim().toLowerCase()
+        if (SYSTEM_PROTECTED.has(name)) {
+            toast.warning('Bu uygulama sistem tarafından zaten muaf tutuluyor')
+            return
+        }
 
         try {
             const { error } = await supabase.from('allowed_apps').insert({
                 device_id: deviceId,
-                app_name: newAppName.trim().toLowerCase(),
+                app_name: name,
                 description: newAppDesc.trim() || null
             })
 
@@ -217,6 +234,15 @@ export default function AllowlistManager({ deviceId, isOnline }: AllowlistManage
 
                 {/* Allowed Apps List */}
                 <div className="space-y-2">
+                    <div className="p-3 bg-white/5 border border-white/10 rounded-lg">
+                        <div className="flex items-center gap-2 text-sm text-slate-300">
+                            <Shield className="w-4 h-4 text-yellow-400" />
+                            Windows sistem uygulamaları her zaman izinlidir ve düzenlenemez.
+                        </div>
+                        <div className="mt-2 text-xs text-slate-500">
+                            Örnek: {Array.from(SYSTEM_PROTECTED).slice(0,6).join(', ')} ...
+                        </div>
+                    </div>
                     <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                         <Check className="w-4 h-4 text-green-400" />
                         Onaylı Uygulamalar ({apps.length})
